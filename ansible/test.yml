@@ -1,0 +1,25 @@
+- hosts: all
+  become: yes
+
+  vars:
+    TZ: Europe/Dublin
+    AdminUser: shichijo
+    locale: en_US.UTF-8
+    hostname: arch-test
+    pacman_mirror: "http://ftp.heanet.ie/mirrors/ftp.archlinux.org/$repo/os/$arch"
+    packages:
+      - sudo
+      - vim
+      - chrony
+  tasks:
+    - name: mkpasswd test
+      shell: mkpasswd -m sha-512
+      register: pw
+
+    - name: test
+#      debug:
+#        var: pw.stdout
+      lineinfile:
+        path: test2.yml
+        regexp: '^    AdminUserPassword:.*$'
+        line: "    AdminUserPassword: {{pw.stdout}}"

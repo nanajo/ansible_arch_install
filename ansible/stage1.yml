@@ -1,0 +1,28 @@
+- hosts: all
+  become: yes
+
+  vars:
+    MountBase: /mnt
+    Partitions:
+      - DevFile: loop0
+        PartFile: loop0p1
+        Number: 1
+        Mountpoint: /boot
+        Fs: vfat
+      - DevFile: loop0
+        PartFile: loop0p2
+        Number: 2
+        Mountpoint: swap
+        Fs: swap
+      - DevFile: loop0
+        PartFile: loop0p3
+        Number: 3
+        Mountpoint: /
+        Fs: ext4
+
+  tasks:
+    - name: make filesystem
+      filesystem:
+        fstype: "{{ item.Fs }}"
+        dev: "/dev/{{ item.PartFile }}"
+      loop: "{{ Partitions }}"

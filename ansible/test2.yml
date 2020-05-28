@@ -1,0 +1,105 @@
+- hosts: all
+  become: yes
+
+  vars:
+    Timezone: Europe/Dublin
+    AdminUser: shichijo
+    AdminUserPassword: $6$g98ErzuD$lMR8ZXXPrbjDx8JrW6oFNXnzThUtR/9W/iW/32YT19L6IetOfmUHkRD6KYzXMzkLVrcf30edjJ9ROQciC0y5d0
+    Locale: en_US.UTF-8
+    Hostname: arch-test
+    BootPartition: /boot
+    Packages:
+      - sudo
+      - vim
+      - chrony
+      - openssh
+      - dhcpcd
+      - git
+    EnabledServices:
+      - chrony
+      - NetworkManager
+    Drivers: virtio_pci virtio_net virtio_console virtio_blk virtio_balloon virtio_rng
+    
+  tasks:
+    - name: Set timezone
+      file:
+        src: "/usr/share/zoneinfo/{{ Timezone }}"
+        dest: /etc/localtime
+
+    - name: Set hostname
+      copy:
+       content: "{{ Hostname }}"
+       dest: /etc/hostname
+       mode: 0644
+
+    - name: Set hosts
+      blockinfile:
+        dest: /etc/hosts
+        block: |
+          127.0.0.1  localhost
+          ::1  localhsot
+          127.0.1.1  {{ hostname }} {{ hostname }}.localdomain
+
+    - name: Set locale
+      locale_gen:
+        name: "{{ Locale }}"
+        state: present
+
+    - name: Make locale.conf
+      copy:
+        content: "LANG={{ Locale }}"
+
+    - name: Install packages
+      package:
+        name: "{{ Packages }}"
+
+    - name: Create user
+      user:
+        name: "{{ AdminUser }}"
+        password: "{{ AdminUserPassword }}"
+        home: /home/"{{ AdminUser }}"
+
+    - name: Set sudoer
+      copy:
+        content: "{{ AdminUser }} ALL=NOPASSWD: ALL"
+        dest: /etc/sudoers.d/admin_nopassword
+        mode: 0440
+
+    - name: Enable services
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+      loop: EnabledServices
+
+    - name: Re-create initramfs stage1
+      lineinfile:
+        path: /etc/mkinitcpio.conf
+        regextp: ^MODULES=\(\)$
+        line: "MODULES=({{Drivers}})"
+      when: Drivers != ""
+
+    - name: Re-create initramfs stage2
+      shell: mkinitcpio -P
+      when: Drivers != ""
+    
+    - name: Install Bootloader
+      shell: "bootctl --path {{ BootPartition }} install"
+
+    - name: Configure loader.conf of systemd-boot
+      copy:
+        content: "timeout 5\ndefault arch*"
+        dest: "{{ BootPartition }}/loader/loader.conf"
+        mode: 0755
+
+    - name: Get root partiton info
+      shell: cat /etc/fstab | awk '{if($2=="/"){print $1}}'
+      register: BootPartitionUUID
+
+    - name: Configure entries of systemd-boot
+      copy:
+        content: "title Arch Linux\nlinux /vmlinuz-linux\ninitrd /initramfs-linux.img\noptions root={{BootPartitionUUID.stdout}}"
+        dest: "{{ BootPartition }}/loader/entries/arch.conf"
+        mode: 0755
+    
+    - name: Update systemd-boot
+      shell: "bootctl --path {{ BootPartition }} update"
