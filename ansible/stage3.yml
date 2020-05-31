@@ -14,7 +14,7 @@
       - dhcpcd
     EnabledServices:
       - chronyd
-    Drivers: virtio_pci virtio_net virtio_console virtio_blk virtio_balloon virtio_rng
+    Drivers: 
     
   tasks:
     - name: Set timezone
@@ -55,7 +55,7 @@
       user:
         name: "{{ AdminUser }}"
         password: "{{ AdminUserPassword }}"
-        home: /home/"{{ AdminUser }}"
+        home: "/home/{{ AdminUser }}"
 
     - name: Set sudoer
       copy:
